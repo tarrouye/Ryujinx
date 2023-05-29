@@ -141,9 +141,9 @@ namespace Ryujinx.Ava.Common
         }
 
         private static string BackupRyujinxData(string titleId, string titleBackupRoot) {
-            string dataPath = Path.Combine(AppDataManager.GamesDirPath, titleId);
-            string outputPath = Path.Combine(titleBackupRoot, "Ryu");
-            return CopyDirectory(dataPath, outputPath) ? outputPath : "";
+            string metadataPath = Path.Combine(AppDataManager.GamesDirPath, titleId, "gui"); // only save gui info bc update/dlc/caches are system dependent
+            string outputPath = Path.Combine(titleBackupRoot, "Ryu", "gui");
+            return CopyDirectory(metadataPath, outputPath) ? outputPath : "";
         }
 
         // fetch the user save data for userId and titleId and backs it up to /backup dir 
