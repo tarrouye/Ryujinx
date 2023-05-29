@@ -89,6 +89,11 @@
                     Header="{locale:Locale MenuBarOptionsManageUserProfiles}"
                     IsEnabled="{Binding EnableNonGameRunningControls}"
                     ToolTip.Tip="{locale:Locale OpenProfileManagerTooltip}" />
+                <MenuItem
+                    Command="{ReflectionBinding BackupAllApplicationsData}"
+                    Header="{locale:Locale MenuBarOptionsBackupAllApplications}"
+                    IsEnabled="{Binding EnableNonGameRunningControls}"
+                    ToolTip.Tip="{locale:Locale MenuBarOptionsBackupAllApplicationsTooltip}" />
             </MenuItem>
             <MenuItem
                 Name="ActionsMenuItem"

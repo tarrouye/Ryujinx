@@ -347,7 +347,7 @@ namespace Ryujinx.Ava.UI.ViewModels
         public bool OpenDeviceSaveDirectoryEnabled => !Utilities.IsZeros(SelectedApplication.ControlHolder.ByteSpan) && SelectedApplication.ControlHolder.Value.DeviceSaveDataSize > 0;
 
         public bool OpenBcatSaveDirectoryEnabled => !Utilities.IsZeros(SelectedApplication.ControlHolder.ByteSpan) && SelectedApplication.ControlHolder.Value.BcatDeliveryCacheStorageSize > 0;
-        
+
         public bool BackupSaveDataEnabled => OpenUserSaveDirectoryEnabled || OpenDeviceSaveDirectoryEnabled || OpenBcatSaveDirectoryEnabled;
 
         public string LoadHeading
@@ -1359,6 +1359,26 @@ namespace Ryujinx.Ava.UI.ViewModels
         public async void ManageProfiles()
         {
             await NavigationDialogHost.Show(AccountManager, ContentManager, VirtualFileSystem, LibHacHorizonManager.RyujinxClient);
+        }
+
+        public async void BackupAllApplicationsData()
+        {
+            bool didSucceed = await ApplicationHelper.BackupAllApplicationData(new List<ApplicationData>(Applications));
+            
+            if (didSucceed) {
+                await ContentDialogHelper.CreateInfoDialog(
+                    "Backup success",
+                    $"Successfully backed up all save data !",
+                    LocaleManager.Instance[LocaleKeys.InputDialogOk],
+                    "",
+                    LocaleManager.Instance[LocaleKeys.RyujinxInfo]
+                );
+            } else {
+                await ContentDialogHelper.CreateWarningDialog(
+                    "Backup Error", 
+                    "Some save data could not be backed up" // TODO: Be more specific !
+                );
+            }
         }
 
         public void SimulateWakeUpMessage()

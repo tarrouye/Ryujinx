@@ -20,6 +20,8 @@
   "MenuBarOptionsStopEmulation": "Stop Emulation",
   "MenuBarOptionsSettings": "_Settings",
   "MenuBarOptionsManageUserProfiles": "_Manage User Profiles",
+  "MenuBarOptionsBackupAllApplications": "Create Application Data Backup",
+  "MenuBarOptionsBackupAllApplicationsTooltip": "Create a backup of all Applications' User, Device, and BCAT Saves, as well as Ryujinx metadata",
   "MenuBarActions": "_Actions",
   "MenuBarOptionsSimulateWakeUpMessage": "Simulate Wake-up message",
   "MenuBarActionsScanAmiibo": "Scan An Amiibo",

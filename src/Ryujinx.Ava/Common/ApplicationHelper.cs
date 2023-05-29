@@ -51,6 +51,8 @@ namespace Ryujinx.Ava.Common
         }
 
         public static async Task<(bool, string)> ImportDataBackup(string titleId, string titleName, BlitStruct<ApplicationControlProperty> controlData) {
+            Logger.Info?.Print(LogClass.Application, $"Trying to import save data for {titleName} [{titleId}]...");
+
             var filters = new List<FileDialogFilter> { ContentDialogHelper.GetRyubakFileFilter() };
             string[] selectedFiles = await ContentDialogHelper.ShowOpenFileDialog("Select a Ryujinx backup", filters, allowsMultiple: false);
             if (selectedFiles == null || selectedFiles.Length <= 0 || selectedFiles[0] == null || !File.Exists(selectedFiles[0])) {
@@ -121,7 +123,7 @@ namespace Ryujinx.Ava.Common
             return (didImportSomeData, "No data for this title was found in the backup");
         }
 
-        static bool ExtractFolder(ZipArchive archive, string archiveFolderPath, string destinationFolderPath)
+        private static bool ExtractFolder(ZipArchive archive, string archiveFolderPath, string destinationFolderPath)
         {
             Logger.Info?.Print(LogClass.Application, $"Extracting folder {archiveFolderPath} from zip to {destinationFolderPath}");
 
@@ -129,7 +131,7 @@ namespace Ryujinx.Ava.Common
             foreach (ZipArchiveEntry entry in archive.Entries)
             {
                 string entryFolderPath = Path.GetDirectoryName(entry.FullName);
-                if (!string.IsNullOrEmpty(entryFolderPath) && entryFolderPath.StartsWith(archiveFolderPath))
+                if (!string.IsNullOrEmpty(entryFolderPath) && entryFolderPath.StartsWith(archiveFolderPath) && !entry.FullName.EndsWith("/") && !entry.FullName.EndsWith("\\"))
                 {
                     string relativePath = entryFolderPath.Substring(archiveFolderPath.Length).TrimStart('/', '\\');
                     string destinationFilePath = Path.Combine(destinationFolderPath, relativePath, entry.Name);
@@ -182,13 +184,34 @@ namespace Ryujinx.Ava.Common
             return ExtractFolder(archive, archiveFolderPath, saveRootPath);
         }
 
+        public static async Task<bool> BackupAllApplicationData(List<ApplicationData> applications)
+        {
+            // TODO: Visualize progress ?
+            return await Task.Run(() => _BackupAllApplicationData(applications));
+        }
+
+        private static async Task<bool> _BackupAllApplicationData(List<ApplicationData> applications)
+        {
+            bool didFail = false;
+            foreach (var app in applications) {
+                var didSucceed = await BackupApplicationData(app.TitleId, app.TitleName, single: false);
+                didFail = didFail || !didSucceed;
+            }
+
+            string backupRoot = Path.Combine(AppDataManager.BaseDirPath, "backup");
+            bool didOutputSucceed = await OutputBackupZip();
+            Directory.Delete(backupRoot, true);
+
+            return didOutputSucceed && !didFail;
+        }
+
         public static async Task<bool> BackupApplicationData(string titleId, string titleName, bool single = true)
         {
             // TODO: Visualize progress ?
             return await Task.Run(() => _BackupApplicationData(titleId, titleName, single));
         }
 
-        private static async Task<bool> _BackupApplicationData(string titleId, string titleName, bool single = true)
+        private static async Task<bool> _BackupApplicationData(string titleId, string titleName, bool single)
         {
             // TODO: Avoid copying all files to temp directory and then zipping
             //       Rather, open a zip file and chain writes to it, then copy that zip to final dest
