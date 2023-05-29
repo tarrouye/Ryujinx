@@ -28,6 +28,10 @@
         Header="{locale:Locale GameListContextMenuBackupSaveData}"
         IsEnabled="{Binding BackupSaveDataEnabled}"
         ToolTip.Tip="{locale:Locale GameListContextMenuBackupSaveDataToolTip}" />
+    <MenuItem
+        Click="ImportSaveData_Click"
+        Header="{locale:Locale GameListContextMenuImportSaveData}"
+        ToolTip.Tip="{locale:Locale GameListContextMenuImportSaveDataToolTip}" />
     <Separator />
     <MenuItem
         Click="OpenTitleUpdateManager_Click"

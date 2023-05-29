@@ -52,6 +52,8 @@
   "GameListContextMenuOpenBcatSaveDirectoryToolTip": "Opens the directory which contains Application's BCAT Save",
   "GameListContextMenuBackupSaveData": "Backup All Save Data",
   "GameListContextMenuBackupSaveDataToolTip": "Create a backup of the Application's User, Device, and BCAT Saves, as well as Ryujinx metadata",
+  "GameListContextMenuImportSaveData": "Import Save Data Backup",
+  "GameListContextMenuImportSaveDataToolTip": "Import a backup of the Application created by Ryujinx",
   "GameListContextMenuManageTitleUpdates": "Manage Title Updates",
   "GameListContextMenuManageTitleUpdatesToolTip": "Opens the Title Update management window",
   "GameListContextMenuManageDlc": "Manage DLC",

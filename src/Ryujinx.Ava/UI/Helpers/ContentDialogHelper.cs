@@ -389,6 +389,15 @@ namespace Ryujinx.Ava.UI.Helpers
             return result;
         }
 
+        public static FileDialogFilter GetRyubakFileFilter()
+        {
+            FileDialogFilter ryubakFilter = new FileDialogFilter();
+            ryubakFilter.Extensions = new List<string> { "ryubak" };
+            ryubakFilter.Name = "Ryujinx Backup File";
+
+            return ryubakFilter;
+        }
+
         public static async Task<string> ShowSaveFileDialog(
             string title = "", 
             string initialFilename = "", 
@@ -411,6 +420,25 @@ namespace Ryujinx.Ava.UI.Helpers
             }
 
             return await saveFileDialog.ShowAsync(GetMainWindow());
+        }
+
+        public static async Task<string[]> ShowOpenFileDialog(
+            string title = "", 
+            List<FileDialogFilter> filters = null,
+            bool allowsMultiple = false
+        )
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            if (title != "") {
+                openFileDialog.Title = title;
+            }
+            if (filters != null) {
+                openFileDialog.Filters = filters;
+            }
+
+            openFileDialog.AllowMultiple = allowsMultiple;
+
+            return await openFileDialog.ShowAsync(GetMainWindow());
         }
 
         private static Window GetMainWindow()

@@ -99,7 +99,7 @@ namespace Ryujinx.Ava.UI.Controls
             {
                 if (viewModel?.SelectedApplication != null)
                 {    
-                    bool didBackupSucceed = await ApplicationHelper.BackupSaveDir(viewModel.AccountManager.GetAllUsers(), viewModel.SelectedApplication.TitleId, viewModel.SelectedApplication.TitleName);
+                    bool didBackupSucceed = await ApplicationHelper.BackupApplicationData(viewModel.SelectedApplication.TitleId, viewModel.SelectedApplication.TitleName);
                     
                     // TODO: Localize
                     await Dispatcher.UIThread.InvokeAsync(async () => {
@@ -115,6 +115,35 @@ namespace Ryujinx.Ava.UI.Controls
                             await ContentDialogHelper.CreateWarningDialog(
                                 "Backup Error", 
                                 $"Error backing up data for {viewModel.SelectedApplication.TitleName} [{viewModel.SelectedApplication.TitleId}]"
+                            );
+                        }
+                    });
+                }
+            }
+        }
+
+        public async void ImportSaveData_Click(object sender, RoutedEventArgs args)
+        {
+            if ((sender as MenuItem)?.DataContext is MainWindowViewModel viewModel)
+            {
+                if (viewModel?.SelectedApplication != null)
+                {    
+                    bool didImportSucceed = await ApplicationHelper.ImportDataBackup(viewModel.SelectedApplication.TitleId, viewModel.SelectedApplication.TitleName);
+                    
+                    // TODO: Localize
+                    await Dispatcher.UIThread.InvokeAsync(async () => {
+                        if (didImportSucceed) {
+                                await ContentDialogHelper.CreateInfoDialog(
+                                    "Import success",
+                                    $"Successfully imported backup for {viewModel.SelectedApplication.TitleName} [{viewModel.SelectedApplication.TitleId}]",
+                                    LocaleManager.Instance[LocaleKeys.InputDialogOk],
+                                    "",
+                                    LocaleManager.Instance[LocaleKeys.RyujinxInfo]
+                                );
+                        } else {
+                            await ContentDialogHelper.CreateWarningDialog(
+                                "Import Error", 
+                                $"Error importing the backup for {viewModel.SelectedApplication.TitleName} [{viewModel.SelectedApplication.TitleId}]"
                             );
                         }
                     });

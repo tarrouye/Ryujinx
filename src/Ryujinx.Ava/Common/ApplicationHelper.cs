@@ -17,7 +17,6 @@ using Ryujinx.Ava.UI.Controls;
 using Ryujinx.Ava.UI.Helpers;
 using Ryujinx.Ava.UI.Windows;
 using Ryujinx.Common.Logging;
-using Ryujinx.Common.Configuration;
 using Ryujinx.HLE.FileSystem;
 using Ryujinx.HLE.HOS;
 using Ryujinx.HLE.HOS.Services.Account.Acc;
@@ -49,7 +48,19 @@ namespace Ryujinx.Ava.Common
             _horizonClient = horizonClient;
             _accountManager = accountManager;
         }
-        public static async Task<bool> BackupSaveDir(IEnumerable<UserProfile> users, string titleId, string titleName, bool single = true)
+
+        public static async Task<bool> ImportDataBackup(string titleId, string titleName) {
+            var filters = new List<FileDialogFilter> { ContentDialogHelper.GetRyubakFileFilter() };
+            string[] selectedFiles = await ContentDialogHelper.ShowOpenFileDialog("Select a Ryujinx backup", filters, allowsMultiple: false);
+            if (selectedFiles == null || selectedFiles.Length <= 0 || selectedFiles[0] == null || !File.Exists(selectedFiles[0])) {
+                Logger.Error?.Print(LogClass.Application, "No backup file was selected to import");
+                return false;
+            }
+
+            return true;
+        }
+
+        public static async Task<bool> BackupApplicationData(string titleId, string titleName, bool single = true)
         {
             // TODO: Avoid copying all files to temp directory and then zipping
             //       Rather, open a zip file and chain writes to it, then copy that zip to final dest
@@ -89,7 +100,7 @@ namespace Ryujinx.Ava.Common
             List<string> createdBackupPaths = new List<string>();
             
             // backup users saves
-            foreach (var user in users) {
+            foreach (var user in _accountManager.GetAllUsers()) {
                 var userId = new LibHac.Fs.UserId((ulong)user.UserId.High, (ulong)user.UserId.Low);
                 var createdPath = BackupUserSaveDir(userId, titleId, titleIdNumber, titleBackupRoot);
                 if (createdPath != "") {
@@ -201,19 +212,15 @@ namespace Ryujinx.Ava.Common
             string backupRoot = Path.Combine(AppDataManager.BaseDirPath, "backup");
             string backupPath = backupRoot;
             string dateString = DateTime.UtcNow.ToString("yyyy_MM_dd");
-            string defaultFilename = $"Ryujinx_Backup_{dateString}.zip";
+            string defaultFilename = $"{dateString}";
             if (titleId != "") {
                 backupPath = Path.Combine(backupPath, titleId);
-                defaultFilename = $"Ryujinx_Backup_{titleId}_{dateString}.zip";
+                defaultFilename = $"{titleId}_{dateString}";
             }
             
             // prepare save dialog
-            FileDialogFilter zipFilter = new FileDialogFilter();
-            zipFilter.Extensions = new List<string> { ".zip" };
-            zipFilter.Name = "ZIP File";
-            var filters = new List<FileDialogFilter> { zipFilter };
-            
-            string zipPath = await ContentDialogHelper.ShowSaveFileDialog("Save backup as...", defaultFilename, filters, ".zip");
+            var filters = new List<FileDialogFilter> { ContentDialogHelper.GetRyubakFileFilter() };
+            string zipPath = await ContentDialogHelper.ShowSaveFileDialog("Save backup as...", defaultFilename, filters);
 
             // if user chose an output location, dump the data to it
             if (zipPath != null && zipPath != "") {
