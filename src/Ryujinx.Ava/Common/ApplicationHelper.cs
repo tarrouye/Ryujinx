@@ -17,6 +17,7 @@ using Ryujinx.Ava.UI.Controls;
 using Ryujinx.Ava.UI.Helpers;
 using Ryujinx.Ava.UI.Windows;
 using Ryujinx.Common.Logging;
+using Ryujinx.Common.Configuration;
 using Ryujinx.HLE.FileSystem;
 using Ryujinx.HLE.HOS;
 using Ryujinx.HLE.HOS.Services.Account.Acc;
@@ -62,6 +63,12 @@ namespace Ryujinx.Ava.Common
 
         public static async Task<bool> BackupApplicationData(string titleId, string titleName, bool single = true)
         {
+            // TODO: Visualize progress ?
+            return await Task.Run(() => _BackupApplicationData(titleId, titleName, single));
+        }
+
+        private static async Task<bool> _BackupApplicationData(string titleId, string titleName, bool single = true)
+        {
             // TODO: Avoid copying all files to temp directory and then zipping
             //       Rather, open a zip file and chain writes to it, then copy that zip to final dest
 
@@ -93,7 +100,6 @@ namespace Ryujinx.Ava.Common
                 return false;
             }
 
-            
             string backupRoot = Path.Combine(AppDataManager.BaseDirPath, "backup");
             string titleBackupRoot = Path.Combine(backupRoot, titleId);
 
@@ -227,7 +233,7 @@ namespace Ryujinx.Ava.Common
                 if (File.Exists(zipPath)) {
                     File.Delete(zipPath);
                 }
-                ZipFile.CreateFromDirectory(backupPath, zipPath);
+                ZipFile.CreateFromDirectory(backupPath, zipPath, compressionLevel: CompressionLevel.SmallestSize, includeBaseDirectory: titleId != "");
             }
 
             // return true if the output file was successfully created
