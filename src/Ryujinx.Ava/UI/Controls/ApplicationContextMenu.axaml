@@ -8,31 +8,33 @@
         Header="{locale:Locale GameListContextMenuToggleFavorite}"
         ToolTip.Tip="{locale:Locale GameListContextMenuToggleFavoriteToolTip}" />
     <Separator />
-    <MenuItem
-        Click="OpenUserSaveDirectory_Click"
-        Header="{locale:Locale GameListContextMenuOpenUserSaveDirectory}"
-        IsEnabled="{Binding OpenUserSaveDirectoryEnabled}"
-        ToolTip.Tip="{locale:Locale GameListContextMenuOpenUserSaveDirectoryToolTip}" />
-    <MenuItem
-        Click="OpenDeviceSaveDirectory_Click"
-        Header="{locale:Locale GameListContextMenuOpenDeviceSaveDirectory}"
-        IsEnabled="{Binding OpenDeviceSaveDirectoryEnabled}"
-        ToolTip.Tip="{locale:Locale GameListContextMenuOpenDeviceSaveDirectoryToolTip}" />
-    <MenuItem
-        Click="OpenBcatSaveDirectory_Click"
-        Header="{locale:Locale GameListContextMenuOpenBcatSaveDirectory}"
-        IsEnabled="{Binding OpenBcatSaveDirectoryEnabled}"
-        ToolTip.Tip="{locale:Locale GameListContextMenuOpenBcatSaveDirectoryToolTip}" />
-    <MenuItem
-        Click="BackupSaveData_Click"
-        Header="{locale:Locale GameListContextMenuBackupSaveData}"
-        IsEnabled="{Binding BackupSaveDataEnabled}"
-        ToolTip.Tip="{locale:Locale GameListContextMenuBackupSaveDataToolTip}" />
-    <MenuItem
-        Click="ImportSaveData_Click"
-        Header="{locale:Locale GameListContextMenuImportSaveData}"
-        ToolTip.Tip="{locale:Locale GameListContextMenuImportSaveDataToolTip}" />
-    <Separator />
+    <MenuItem Header="{locale:Locale GameListContextMenuSaveManagement}">
+        <MenuItem
+            Click="OpenUserSaveDirectory_Click"
+            Header="{locale:Locale GameListContextMenuOpenUserSaveDirectory}"
+            IsEnabled="{Binding OpenUserSaveDirectoryEnabled}"
+            ToolTip.Tip="{locale:Locale GameListContextMenuOpenUserSaveDirectoryToolTip}" />
+        <MenuItem
+            Click="OpenDeviceSaveDirectory_Click"
+            Header="{locale:Locale GameListContextMenuOpenDeviceSaveDirectory}"
+            IsEnabled="{Binding OpenDeviceSaveDirectoryEnabled}"
+            ToolTip.Tip="{locale:Locale GameListContextMenuOpenDeviceSaveDirectoryToolTip}" />
+        <MenuItem
+            Click="OpenBcatSaveDirectory_Click"
+            Header="{locale:Locale GameListContextMenuOpenBcatSaveDirectory}"
+            IsEnabled="{Binding OpenBcatSaveDirectoryEnabled}"
+            ToolTip.Tip="{locale:Locale GameListContextMenuOpenBcatSaveDirectoryToolTip}" />
+        <Separator />
+        <MenuItem
+            Click="BackupSaveData_Click"
+            Header="{locale:Locale GameListContextMenuBackupSaveData}"
+            IsEnabled="{Binding BackupSaveDataEnabled}"
+            ToolTip.Tip="{locale:Locale GameListContextMenuBackupSaveDataToolTip}" />
+        <MenuItem
+            Click="ImportSaveData_Click"
+            Header="{locale:Locale GameListContextMenuImportSaveData}"
+            ToolTip.Tip="{locale:Locale GameListContextMenuImportSaveDataToolTip}" />
+    </MenuItem>
     <MenuItem
         Click="OpenTitleUpdateManager_Click"
         Header="{locale:Locale GameListContextMenuManageTitleUpdates}"

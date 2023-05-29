@@ -46,6 +46,7 @@
   "GameListHeaderFileExtension": "File Ext",
   "GameListHeaderFileSize": "File Size",
   "GameListHeaderPath": "Path",
+  "GameListContextMenuSaveManagement": "Manage Saves",
   "GameListContextMenuOpenUserSaveDirectory": "Open User Save Directory",
   "GameListContextMenuOpenUserSaveDirectoryToolTip": "Opens the directory which contains Application's User Save",
   "GameListContextMenuOpenDeviceSaveDirectory": "Open Device Save Directory",
