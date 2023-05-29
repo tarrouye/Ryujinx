@@ -12,6 +12,7 @@ using Ryujinx.Common.Logging;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace Ryujinx.Ava.UI.Helpers
 {
@@ -386,6 +387,30 @@ namespace Ryujinx.Ava.UI.Helpers
             }
 
             return result;
+        }
+
+        public static async Task<string> ShowSaveFileDialog(
+            string title = "", 
+            string initialFilename = "", 
+            List<FileDialogFilter> filters = null, 
+            string defaultExtension = ""
+        )
+        {
+            SaveFileDialog saveFileDialog = new SaveFileDialog();
+            if (title != "") {
+                saveFileDialog.Title = title;
+            }
+            if (initialFilename != "") {
+                saveFileDialog.InitialFileName = initialFilename;
+            }
+            if (filters != null) {
+                saveFileDialog.Filters = filters;
+            }
+            if (defaultExtension != "") {
+                saveFileDialog.DefaultExtension = defaultExtension;
+            }
+
+            return await saveFileDialog.ShowAsync(GetMainWindow());
         }
 
         private static Window GetMainWindow()

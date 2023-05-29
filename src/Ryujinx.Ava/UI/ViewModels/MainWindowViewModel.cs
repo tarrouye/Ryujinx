@@ -347,6 +347,8 @@ namespace Ryujinx.Ava.UI.ViewModels
         public bool OpenDeviceSaveDirectoryEnabled => !Utilities.IsZeros(SelectedApplication.ControlHolder.ByteSpan) && SelectedApplication.ControlHolder.Value.DeviceSaveDataSize > 0;
 
         public bool OpenBcatSaveDirectoryEnabled => !Utilities.IsZeros(SelectedApplication.ControlHolder.ByteSpan) && SelectedApplication.ControlHolder.Value.BcatDeliveryCacheStorageSize > 0;
+        
+        public bool BackupSaveDataEnabled => OpenUserSaveDirectoryEnabled || OpenDeviceSaveDirectoryEnabled || OpenBcatSaveDirectoryEnabled;
 
         public string LoadHeading
         {

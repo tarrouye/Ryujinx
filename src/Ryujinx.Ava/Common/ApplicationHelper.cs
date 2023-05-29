@@ -17,6 +17,7 @@ using Ryujinx.Ava.UI.Controls;
 using Ryujinx.Ava.UI.Helpers;
 using Ryujinx.Ava.UI.Windows;
 using Ryujinx.Common.Logging;
+using Ryujinx.Common.Configuration;
 using Ryujinx.HLE.FileSystem;
 using Ryujinx.HLE.HOS;
 using Ryujinx.HLE.HOS.Services.Account.Acc;
@@ -28,6 +29,9 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Path = System.IO.Path;
+using System.Globalization;
+using System.IO.Compression;
+using System.Collections.Generic;
 
 namespace Ryujinx.Ava.Common
 {
@@ -44,6 +48,224 @@ namespace Ryujinx.Ava.Common
             _virtualFileSystem = virtualFileSystem;
             _horizonClient = horizonClient;
             _accountManager = accountManager;
+        }
+        public static async Task<bool> BackupSaveDir(IEnumerable<UserProfile> users, string titleId, string titleName, bool single = true)
+        {
+            // TODO: Avoid copying all files to temp directory and then zipping
+            //       Rather, open a zip file and chain writes to it, then copy that zip to final dest
+
+            // Need to backup: SaveDataType.Bcat, SaveDataType.Device (for UserID default)
+            //                 SaveDataType.Account (for all User IDs)
+            //                 Metadata
+            //                 Maybe ? User Profiles (in order to handle mapping on import)
+
+            // Backup structure:
+            // Root
+            // |_ {TitleId}
+            //   |_ Ryu
+            //   |_ Device
+            //   |_ BCAT
+            //   |_ User
+            //     |_ 0
+            //     |_ 1
+            // |_ {TitleId}
+            //   |_ Ryu
+            //   |_ Device
+            //   |_ BCAT
+            //   |_ User
+            //     |_ 0
+            //     |_ 1
+
+            if (!ulong.TryParse(titleId, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong titleIdNumber))
+            {
+                Logger.Error?.Print(LogClass.Application, $"Invalid titleId {titleId}");
+                return false;
+            }
+
+            
+            string backupRoot = Path.Combine(AppDataManager.BaseDirPath, "backup");
+            string titleBackupRoot = Path.Combine(backupRoot, titleId);
+
+            List<string> createdBackupPaths = new List<string>();
+            
+            // backup users saves
+            foreach (var user in users) {
+                var userId = new LibHac.Fs.UserId((ulong)user.UserId.High, (ulong)user.UserId.Low);
+                var createdPath = BackupUserSaveDir(userId, titleId, titleIdNumber, titleBackupRoot);
+                if (createdPath != "") {
+                    createdBackupPaths.Add(createdPath);
+                }
+            }
+
+            // backup device save
+            var deviceBackupPath = BackupDeviceSaveDir(titleId, titleIdNumber, titleBackupRoot);
+            if (deviceBackupPath != "") {
+                createdBackupPaths.Add(deviceBackupPath);
+            }
+            // backup bcat save
+            var bcatBackupPath = BackupBCATSaveDir(titleId, titleIdNumber, titleBackupRoot);
+            if (bcatBackupPath != "") {
+                createdBackupPaths.Add(bcatBackupPath);
+            }
+
+            // backup ryujinx data
+            var ryuBackupPath = BackupRyujinxData(titleId, titleBackupRoot);
+            if (ryuBackupPath != "") {
+                createdBackupPaths.Add(ryuBackupPath);
+            }
+
+            if (createdBackupPaths.Count > 0) {
+                Logger.Info?.Print(LogClass.Application, $"Successfully backed up save data folder for {titleName} [{titleId}]");
+
+                 // if not part of a full backup, output the backup and then cleanup after ourselves
+                if (single) {
+                    bool didOutputSucceed = await OutputBackupZip(titleId);
+                    Directory.Delete(backupRoot, true);
+
+                    return didOutputSucceed;
+                }
+
+                return true;
+            } else {
+                Logger.Error?.Print(LogClass.Application, $"Failed to backup save data folder for {titleName} [{titleId}].");
+
+                // cleanup remains
+                foreach (var path in createdBackupPaths) {
+                    if (Directory.Exists(path)) {
+                        Directory.Delete(path, true);
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static string BackupRyujinxData(string titleId, string titleBackupRoot) {
+            string dataPath = Path.Combine(AppDataManager.GamesDirPath, titleId);
+            string outputPath = Path.Combine(titleBackupRoot, "Ryu");
+            return CopyDirectory(dataPath, outputPath) ? outputPath : "";
+        }
+
+        // fetch the user save data for userId and titleId and backs it up to /backup dir 
+        private static string BackupUserSaveDir(LibHac.Fs.UserId userId, string titleId, ulong titleIdNumber, string titleBackupRoot) {
+            var saveDataFilter = SaveDataFilter.Make(titleIdNumber, SaveDataType.Account, userId, saveDataId: default, index: default);
+            string outputPath = Path.Combine(titleBackupRoot, $"User/{userId.ToString()}");
+            return BackupSaveData(saveDataFilter, titleId, outputPath);
+        }
+
+        // fetch the device save data for titleId and backs it up to /backup dir 
+        private static string BackupDeviceSaveDir(string titleId, ulong titleIdNumber, string titleBackupRoot) {
+            var saveDataFilter = SaveDataFilter.Make(titleIdNumber, SaveDataType.Device, userId: default, saveDataId: default, index: default);
+            string outputPath = Path.Combine(titleBackupRoot, "Device");
+            return BackupSaveData(saveDataFilter, titleId, outputPath);
+        }
+
+        // fetch the device save data for titleId and backs it up to /backup dir 
+        private static string BackupBCATSaveDir(string titleId, ulong titleIdNumber, string titleBackupRoot) {
+            var saveDataFilter = SaveDataFilter.Make(titleIdNumber, SaveDataType.Bcat, userId: default, saveDataId: default, index: default);
+            string outputPath = Path.Combine(titleBackupRoot, "BCAT");
+            return BackupSaveData(saveDataFilter, titleId, outputPath);
+        }
+
+        // fetch the save data based on the filter and back it up to /backup dir
+        private static string BackupSaveData(SaveDataFilter saveDataFilter, string titleId, string outputPath) {
+            ulong saveDataId = default;
+
+            Result result = _horizonClient.Fs.FindSaveDataWithFilter(out SaveDataInfo saveDataInfo, SaveDataSpaceId.User, in saveDataFilter);
+            
+            if (result.IsSuccess()) {
+                saveDataId = saveDataInfo.SaveDataId;
+            } else {
+                Logger.Warning?.Print(LogClass.Application, $"No save data was found for [{titleId}]. Skipping backup.");
+                return "";
+            }
+
+            string saveRootPath = Path.Combine(_virtualFileSystem.GetNandPath(), $"user/save/{saveDataId:x16}");
+
+            Logger.Info?.Print(LogClass.Application, $"Want to backup {saveRootPath} to {outputPath}");
+
+            if (Directory.Exists(outputPath))
+            {
+                Logger.Info?.Print(LogClass.Application, $"Backup already exists at {outputPath}, deleting.");
+                Directory.Delete(outputPath, true);
+            }
+
+            bool didCopySucceed = CopyDirectory(saveRootPath, outputPath);
+
+            return didCopySucceed ? outputPath : "";
+        }
+
+        private static async Task<bool> OutputBackupZip(string titleId = "")
+        {
+            // resolve paths
+            string backupRoot = Path.Combine(AppDataManager.BaseDirPath, "backup");
+            string backupPath = backupRoot;
+            string dateString = DateTime.UtcNow.ToString("yyyy_MM_dd");
+            string defaultFilename = $"Ryujinx_Backup_{dateString}.zip";
+            if (titleId != "") {
+                backupPath = Path.Combine(backupPath, titleId);
+                defaultFilename = $"Ryujinx_Backup_{titleId}_{dateString}.zip";
+            }
+            
+            // prepare save dialog
+            FileDialogFilter zipFilter = new FileDialogFilter();
+            zipFilter.Extensions = new List<string> { ".zip" };
+            zipFilter.Name = "ZIP File";
+            var filters = new List<FileDialogFilter> { zipFilter };
+            
+            string zipPath = await ContentDialogHelper.ShowSaveFileDialog("Save backup as...", defaultFilename, filters, ".zip");
+
+            // if user chose an output location, dump the data to it
+            if (zipPath != null && zipPath != "") {
+                if (File.Exists(zipPath)) {
+                    File.Delete(zipPath);
+                }
+                ZipFile.CreateFromDirectory(backupPath, zipPath);
+            }
+
+            // return true if the output file was successfully created
+            return File.Exists(zipPath);
+        }
+
+        // Returns `true` if entire directory contents were successfully copied
+        private static bool CopyDirectory(string sourcePath, string destinationPath)
+        {
+            // TODO: Guard against not having enough space at destination 
+            bool didError = false;
+
+            if (!Directory.Exists(destinationPath))
+            {
+                Directory.CreateDirectory(destinationPath);
+            }
+
+            string[] files = Directory.GetFiles(sourcePath);
+            foreach (string file in files)
+            {
+                try {
+                    string name = Path.GetFileName(file);
+                    string dest = Path.Combine(destinationPath, name);
+                    File.Copy(file, dest);
+                } catch {
+                    Logger.Error?.Print(LogClass.Application, $"Unable to backup file {file} to {destinationPath}");
+                    didError = true;
+                }
+            }
+
+            string[] folders = Directory.GetDirectories(sourcePath);
+            foreach (string folder in folders)
+            {
+                try {
+                    string name = Path.GetFileName(folder);
+                    string dest = Path.Combine(destinationPath, name);
+                    bool didSubCopySucceed = CopyDirectory(folder, dest);
+                    didError = didError || !didSubCopySucceed;
+                } catch {
+                    Logger.Error?.Print(LogClass.Application, $"Unable to backup directory {folder} to {destinationPath}");
+                    didError = true;
+                }
+            }
+
+            return !didError;
         }
 
         private static bool TryFindSaveData(string titleName, ulong titleId, BlitStruct<ApplicationControlProperty> controlHolder, in SaveDataFilter filter, out ulong saveDataId)

@@ -93,6 +93,35 @@ namespace Ryujinx.Ava.UI.Controls
             }
         }
 
+        public async void BackupSaveData_Click(object sender, RoutedEventArgs args)
+        {
+            if ((sender as MenuItem)?.DataContext is MainWindowViewModel viewModel)
+            {
+                if (viewModel?.SelectedApplication != null)
+                {    
+                    bool didBackupSucceed = await ApplicationHelper.BackupSaveDir(viewModel.AccountManager.GetAllUsers(), viewModel.SelectedApplication.TitleId, viewModel.SelectedApplication.TitleName);
+                    
+                    // TODO: Localize
+                    await Dispatcher.UIThread.InvokeAsync(async () => {
+                        if (didBackupSucceed) {
+                                await ContentDialogHelper.CreateInfoDialog(
+                                    "Backup success",
+                                    $"Successfully backed up save data folder for {viewModel.SelectedApplication.TitleName} [{viewModel.SelectedApplication.TitleId}]",
+                                    LocaleManager.Instance[LocaleKeys.InputDialogOk],
+                                    "",
+                                    LocaleManager.Instance[LocaleKeys.RyujinxInfo]
+                                );
+                        } else {
+                            await ContentDialogHelper.CreateWarningDialog(
+                                "Backup Error", 
+                                $"Error backing up data for {viewModel.SelectedApplication.TitleName} [{viewModel.SelectedApplication.TitleId}]"
+                            );
+                        }
+                    });
+                }
+            }
+        }
+
         public async void OpenTitleUpdateManager_Click(object sender, RoutedEventArgs args)
         {
             var viewModel = (sender as MenuItem)?.DataContext as MainWindowViewModel;
