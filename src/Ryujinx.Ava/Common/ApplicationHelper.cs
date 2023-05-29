@@ -50,15 +50,136 @@ namespace Ryujinx.Ava.Common
             _accountManager = accountManager;
         }
 
-        public static async Task<bool> ImportDataBackup(string titleId, string titleName) {
+        public static async Task<(bool, string)> ImportDataBackup(string titleId, string titleName, BlitStruct<ApplicationControlProperty> controlData) {
             var filters = new List<FileDialogFilter> { ContentDialogHelper.GetRyubakFileFilter() };
             string[] selectedFiles = await ContentDialogHelper.ShowOpenFileDialog("Select a Ryujinx backup", filters, allowsMultiple: false);
             if (selectedFiles == null || selectedFiles.Length <= 0 || selectedFiles[0] == null || !File.Exists(selectedFiles[0])) {
                 Logger.Error?.Print(LogClass.Application, "No backup file was selected to import");
-                return false;
+                return (false, "No backup file was selected to import");
+            }
+            // paths within the backup
+
+
+            if (!ulong.TryParse(titleId, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong titleIdNumber))
+            {
+                Logger.Error?.Print(LogClass.Application, $"Invalid titleId {titleId}");
+                return (false, "Invalid Title ID");
             }
 
-            return true;
+            bool isByteSpanOK = !Utilities.IsZeros(controlData.ByteSpan);
+            bool isUserSaveDirOK = isByteSpanOK && controlData.Value.UserAccountSaveDataSize > 0;
+            bool isDeviceSaveDirOK = isByteSpanOK && controlData.Value.DeviceSaveDataSize > 0;
+            bool isBCATSaveDirOK = isByteSpanOK && controlData.Value.BcatDeliveryCacheStorageSize > 0;
+
+            bool didImportSomeData = false;
+            using (ZipArchive archive = ZipFile.OpenRead(selectedFiles[0]))
+            {
+                // import Ryujinx data if exists
+                if (ImportRyujinxData(titleId, archive))
+                {
+                    Logger.Info?.Print(LogClass.Application, $"Ryujinx metadata found for {titleId}. Importing.");
+                    // TODO: Trigger a refresh of the UI if metadata was imported
+                    didImportSomeData = true;
+                } else {
+                    Logger.Info?.Print(LogClass.Application, $"No Ryujinx metadata found for {titleId}");
+                }
+
+                // import Device saves if exist
+                if (isDeviceSaveDirOK && ImportDeviceData(titleName, titleId, titleIdNumber, controlData, archive))
+                {
+                    Logger.Info?.Print(LogClass.Application, $"Device save data found for {titleId}. Importing.");
+                    didImportSomeData = true;
+                } else {
+                    Logger.Info?.Print(LogClass.Application, $"No Device save data found for {titleId}");
+                }
+
+                // import BCAT saves if exist
+                if (isBCATSaveDirOK && ImportBCATData(titleName, titleId, titleIdNumber, controlData, archive))
+                {
+                    Logger.Info?.Print(LogClass.Application, $"BCAT save data found for {titleId}. Importing.");
+                    didImportSomeData = true;
+                } else {
+                    Logger.Info?.Print(LogClass.Application, $"No BCAT save data found for {titleId}");
+                }
+
+                // import User saves if exist
+                // TODO: Handle mapping of profiles, create profiles if needed, or just warn. ???
+                if (isUserSaveDirOK) {
+                    foreach (var user in _accountManager.GetAllUsers()) {
+                        var userId = new LibHac.Fs.UserId((ulong)user.UserId.High, (ulong)user.UserId.Low);
+                        if (ImportUserSaveData(userId, titleName, titleId, titleIdNumber, controlData, archive))
+                        {
+                            Logger.Info?.Print(LogClass.Application, $"User {userId} save data found for {titleId}. Importing.");
+                            didImportSomeData = true;
+                        } else {
+                            Logger.Info?.Print(LogClass.Application, $"No user {userId} save data found for {titleId}");
+                        }
+                    }
+                }
+            }
+
+            return (didImportSomeData, "No data for this title was found in the backup");
+        }
+
+        static bool ExtractFolder(ZipArchive archive, string archiveFolderPath, string destinationFolderPath)
+        {
+            Logger.Info?.Print(LogClass.Application, $"Extracting folder {archiveFolderPath} from zip to {destinationFolderPath}");
+
+            bool didFindOne = false;
+            foreach (ZipArchiveEntry entry in archive.Entries)
+            {
+                string entryFolderPath = Path.GetDirectoryName(entry.FullName);
+                if (!string.IsNullOrEmpty(entryFolderPath) && entryFolderPath.StartsWith(archiveFolderPath))
+                {
+                    string relativePath = entryFolderPath.Substring(archiveFolderPath.Length).TrimStart('/', '\\');
+                    string destinationFilePath = Path.Combine(destinationFolderPath, relativePath, entry.Name);
+                    string destinationDirectory = Path.GetDirectoryName(destinationFilePath);
+                    Directory.CreateDirectory(destinationDirectory);
+                    if (!Directory.Exists(destinationDirectory)) {
+                        Directory.CreateDirectory(destinationDirectory);
+                    }
+                    Logger.Info?.Print(LogClass.Application, $"Found matching file {entry.FullName}, want to extract to {destinationFilePath}");
+                    entry.ExtractToFile(destinationFilePath, overwrite: true);
+                    didFindOne = true;
+                }
+            }
+
+            return didFindOne;
+        }
+
+        private static bool ImportRyujinxData(string titleId, ZipArchive archive) {
+            string dataPath = Path.Combine(AppDataManager.GamesDirPath, titleId);
+            return ExtractFolder(archive, Path.Combine($"{titleId}", "Ryu"), dataPath);
+        }
+
+        private static bool ImportDeviceData(string titleName, string titleId, ulong titleIdNumber, BlitStruct<ApplicationControlProperty> controlData, ZipArchive archive) {
+            var saveDataFilter = SaveDataFilter.Make(titleIdNumber, SaveDataType.Device, userId: default, saveDataId: default, index: default);
+
+            return ImportSaveDir(titleName, titleId, titleIdNumber, controlData, saveDataFilter, archive, Path.Combine($"{titleId}", "Device"));
+        }
+
+        private static bool ImportBCATData(string titleName, string titleId, ulong titleIdNumber, BlitStruct<ApplicationControlProperty> controlData, ZipArchive archive) {
+            var saveDataFilter = SaveDataFilter.Make(titleIdNumber, SaveDataType.Bcat, userId: default, saveDataId: default, index: default);
+
+            return ImportSaveDir(titleName, titleId, titleIdNumber, controlData, saveDataFilter, archive,  Path.Combine($"{titleId}", "BCAT"));
+        }
+
+         private static bool ImportUserSaveData(LibHac.Fs.UserId userId, string titleName, string titleId, ulong titleIdNumber, BlitStruct<ApplicationControlProperty> controlData, ZipArchive archive) {
+            var saveDataFilter = SaveDataFilter.Make(titleIdNumber, SaveDataType.Account, userId, saveDataId: default, index: default);
+
+            return ImportSaveDir(titleName, titleId, titleIdNumber, controlData, saveDataFilter, archive, Path.Combine($"{titleId}", "User", userId.ToString()));
+        }
+
+        private static bool ImportSaveDir(string titleName, string titleId, ulong titleIdNumber, BlitStruct<ApplicationControlProperty> controlData, in SaveDataFilter saveDataFilter, ZipArchive archive, string archiveFolderPath)
+        {
+            if (!TryFindSaveData(titleName, titleIdNumber, controlData, in saveDataFilter, out ulong saveDataId))
+            {
+                Logger.Error?.Print(LogClass.Application, $"Could not find/create save directory for {titleName} [{titleId}]");
+                return false;
+            }
+            string saveRootPath = Path.Combine(_virtualFileSystem.GetNandPath(), $"user/save/{saveDataId:x16}");
+
+            return ExtractFolder(archive, archiveFolderPath, saveRootPath);
         }
 
         public static async Task<bool> BackupApplicationData(string titleId, string titleName, bool single = true)
@@ -166,7 +287,7 @@ namespace Ryujinx.Ava.Common
         // fetch the user save data for userId and titleId and backs it up to /backup dir 
         private static string BackupUserSaveDir(LibHac.Fs.UserId userId, string titleId, ulong titleIdNumber, string titleBackupRoot) {
             var saveDataFilter = SaveDataFilter.Make(titleIdNumber, SaveDataType.Account, userId, saveDataId: default, index: default);
-            string outputPath = Path.Combine(titleBackupRoot, $"User/{userId.ToString()}");
+            string outputPath = Path.Combine(titleBackupRoot, "User", userId.ToString());
             return BackupSaveData(saveDataFilter, titleId, outputPath);
         }
 

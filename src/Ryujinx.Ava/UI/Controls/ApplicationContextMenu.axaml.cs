@@ -128,11 +128,11 @@ namespace Ryujinx.Ava.UI.Controls
             {
                 if (viewModel?.SelectedApplication != null)
                 {    
-                    bool didImportSucceed = await ApplicationHelper.ImportDataBackup(viewModel.SelectedApplication.TitleId, viewModel.SelectedApplication.TitleName);
+                    (bool didSucceed, string error) result = await ApplicationHelper.ImportDataBackup(viewModel.SelectedApplication.TitleId, viewModel.SelectedApplication.TitleName, viewModel.SelectedApplication.ControlHolder);
                     
                     // TODO: Localize
                     await Dispatcher.UIThread.InvokeAsync(async () => {
-                        if (didImportSucceed) {
+                        if (result.didSucceed) {
                                 await ContentDialogHelper.CreateInfoDialog(
                                     "Import success",
                                     $"Successfully imported backup for {viewModel.SelectedApplication.TitleName} [{viewModel.SelectedApplication.TitleId}]",
@@ -142,8 +142,8 @@ namespace Ryujinx.Ava.UI.Controls
                                 );
                         } else {
                             await ContentDialogHelper.CreateWarningDialog(
-                                "Import Error", 
-                                $"Error importing the backup for {viewModel.SelectedApplication.TitleName} [{viewModel.SelectedApplication.TitleId}]"
+                                $"Error importing the backup for {viewModel.SelectedApplication.TitleName} [{viewModel.SelectedApplication.TitleId}]", 
+                                $"{result.error}"
                             );
                         }
                     });
